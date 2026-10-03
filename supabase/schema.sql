@@ -55,3 +55,23 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
 after insert on auth.users
 for each row execute procedure public.handle_new_user();
+
+
+-- Demo KYC status only. Do not store government ID images or sensitive documents here.
+create table if not exists public.demo_kyc_profiles (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  full_name text,
+  date_of_birth date,
+  address text,
+  id_type text check (id_type in ('Passport','Driver''s License','National ID','Other government ID')),
+  status text not null default 'not_submitted' check (status in ('not_submitted','pending','verified','needs_review')),
+  submitted_at timestamptz,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.demo_kyc_profiles enable row level security;
+
+create policy "demo kyc own row" on public.demo_kyc_profiles
+for all to authenticated
+using ((select auth.uid()) = user_id)
+with check ((select auth.uid()) = user_id);
